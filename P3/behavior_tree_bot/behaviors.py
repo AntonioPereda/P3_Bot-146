@@ -72,19 +72,19 @@ def protect_ally(state):
     myActiveFleetsByDST = [fleet.destination_planet for fleet in state.my_fleets()]
 
     activeEnemyFleets = [fleet for fleet in state.enemy_fleets()]
+
+    planetToAttacker = {}
     
     for enemyFleet in activeEnemyFleets:
         if enemyFleet.destination_planet in myAlliesByID:
             alliesUnderAttackByID.append(enemyFleet.destination_planet)
+            planetToAttacker[enemyFleet.destination_planet] = enemyFleet
     
     #DST IMPLIMENTATION
     alliesToSave = [grabPlanetByID(ID, allyPlanets) for ID in alliesUnderAttackByID]
 
-    #send help to allies not already under threat
-    for _ in range(len(alliesToSave)):
-
-        #!!!logic for sending closest ally planet
-        planetToDefend = min(alliesToSave, key=lambda p: p.num_ships, default=None)
+    #send help to allies under threat
+    for planetToDefend in range(len(alliesToSave)):
         
         try: #ensuring that we have they key-value pair set up
             planetsWithinRange[planetToDefend]
@@ -92,15 +92,55 @@ def protect_ally(state):
             discoverClosestAllies(state, planetToDefend, allyPlanets)
 
         #who is the strongest ally within range?
-        closestStrongestAlly = max(planetsWithinRange[planetToDefend], key=lambda p: p.num_ships, default=None)
+        closeStrongestAlly = max(planetsWithinRange[planetToDefend], key=lambda p: p.num_ships, default=None)
+            
+        #if no strong ally within range, different protocol
+        if closeStrongestAlly == None:
+            
+            attacker = planetToAttacker[planetToDefend.ID]
 
-        #if no strong ally within range, not worth protecting - skip
-        if closestStrongestAlly == None:
+            #is it predicted to likely to lose?
+            estSizeByTouchdown = planetToDefend.num_ships + (attacker.turns_remaining 
+            * planetToDefend.growth_rate)
+            
+            if attacker.num_ships > estSizeByTouchdown:
+                pass
+
+                #if we send OP backup, will we instantly reclaim?
+                strongestAllyPlanet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+                takeoverGrowthConsideration = 1.25 #~25% consideration for growth rate & time/distance
+
+                                                        #est size of planet after enemy takes over and few turns pass
+                if (strongestAllyPlanet.num_ships/5) > int((attacker.num_ships-estSizeByTouchdown)*takeoverGrowthConsideration):
+                    if planetToDefend.ID not in myActiveFleetsByDST:
+                        issue_order(state, strongestAllyPlanet.ID, planetToDefend.ID, 
+                                    closeStrongestAlly.num_ships / 5)
+
+                #its going to lose anyways, sac itself equally amongst weaker planets
+                else:
+                    for ally in alliesToSave:
+                        if ally != planetToDefend:
+                            issue_order(state, planetToDefend.ID, ally.ID, 
+                                        closeStrongestAlly.num_ships / len(alliesToSave)-1)
+
+
+            #its going to win anyways, move on...
             continue
-            #keep as is, or, send closest one globally if under attack?
-        
-        #dont send multiple ships at once
+
+        #dont send duplicate ships
         if planetToDefend.ID not in myActiveFleetsByDST:
-            issue_order(state, closestStrongestAlly.ID, planetToDefend.ID, closestStrongestAlly.num_ships / 4)
+            
+            #all ships send help if weak ally under attack
+            for ally in planetsWithinRange[planetToDefend]:
+
+                #for closeStrongestAlly, it contributes more ships to help
+                if closeStrongestAlly == ally:
+                    issue_order(state, closeStrongestAlly.ID, planetToDefend.ID, 
+                                closeStrongestAlly.num_ships / 5)
+
+                #all allies (excl any under attack) send tiny help as well
+                elif closeStrongestAlly != ally and ally not in alliesToSave:
+                    issue_order(state, ally.ID, planetToDefend.ID, 
+                                closeStrongestAlly.num_ships / 7)
 
     return True
