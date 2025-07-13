@@ -18,6 +18,44 @@ def discoverClosestAllies(state, planet, myAllies):
             planetsWithinRange[planet].append(ally)
 
 
+strongAlly = 1
+nearbyAlly = 2
+globalStrongest = 3
+selfDestruct = 4
+
+def fleetSize(state, fromPlanet, toPlanet, case):
+
+    if strongAlly:
+        #target has faster growth rate, dont need to send as many ships
+        if toPlanet.growth_rate > fromPlanet.growth_rate:
+            return fromPlanet.num_ships//5
+        
+        #we can make up the extra ships we sent in a few turns
+        else: 
+            return (fromPlanet.num_ships//5) + toPlanet.growth_rate * state.distance(fromPlanet.ID, toPlanet.ID)
+    
+    #same logic as above, just smaller amount
+    elif nearbyAlly:
+        if toPlanet.growth_rate > fromPlanet.growth_rate:
+            return fromPlanet.num_ships//7
+        
+        #we can make up the extra ships we sent in a few turns
+        else: 
+            return (fromPlanet.num_ships//7) + toPlanet.growth_rate * state.distance(fromPlanet.ID, toPlanet.ID)//2
+
+    elif globalStrongest:
+        distance = state.distance(fromPlanet.ID, toPlanet.ID)
+
+        return (fromPlanet.growth_rate * distance) + fromPlanet.num_ships//5
+
+    #for selfDestruct, pass len(alliesToSave) -1 in toPlanet
+    elif selfDestruct:
+        return fromPlanet.num_ships// toPlanet
+
+    else:
+        raise ValueError("Unknown <case> Input. Must be strongAlly, nearbyAlly, globalStrongest or selfDestruct")
+
+
 
 def grabPlanetByID(planetID, possiblePlanets):
     for planet in possiblePlanets:
@@ -106,7 +144,7 @@ def protect_ally(state):
             if attacker.num_ships > estSizeByTouchdown:
                 pass
 
-                #if we send OP backup, will we instantly reclaim?
+                #if we send OP backup, will we instantly reclaim or win?
                 strongestAllyPlanet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
                 takeoverGrowthConsideration = 1.25 #~25% consideration for growth rate & time/distance
 
@@ -114,14 +152,14 @@ def protect_ally(state):
                 if (strongestAllyPlanet.num_ships/5) > int((attacker.num_ships-estSizeByTouchdown)*takeoverGrowthConsideration):
                     if planetToDefend.ID not in myActiveFleetsByDST:
                         issue_order(state, strongestAllyPlanet.ID, planetToDefend.ID, 
-                                    closeStrongestAlly.num_ships / 5)
+                                    fleetSize(state, strongestAllyPlanet, planetToDefend, strongestAllyPlanet))
 
                 #its going to lose anyways, sac itself equally amongst weaker planets
                 else:
                     for ally in alliesToSave:
                         if ally != planetToDefend:
                             issue_order(state, planetToDefend.ID, ally.ID, 
-                                        closeStrongestAlly.num_ships / len(alliesToSave)-1)
+                                        fleetSize(state, planetToDefend, len(alliesToSave)-1, selfDestruct))
 
 
             #its going to win anyways, move on...
@@ -136,11 +174,11 @@ def protect_ally(state):
                 #for closeStrongestAlly, it contributes more ships to help
                 if closeStrongestAlly == ally:
                     issue_order(state, closeStrongestAlly.ID, planetToDefend.ID, 
-                                closeStrongestAlly.num_ships / 5)
+                                fleetSize(state, closeStrongestAlly, planetToDefend, strongAlly))
 
                 #all allies (excl any under attack) send tiny help as well
                 elif closeStrongestAlly != ally and ally not in alliesToSave:
                     issue_order(state, ally.ID, planetToDefend.ID, 
-                                closeStrongestAlly.num_ships / 7)
+                                fleetSize(state, strongestAllyPlanet, planetToDefend, nearbyAlly))
 
     return True
