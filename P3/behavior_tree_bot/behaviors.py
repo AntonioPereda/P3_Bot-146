@@ -122,7 +122,7 @@ def protect_ally(state):
     alliesToSave = [grabPlanetByID(ID, allyPlanets) for ID in alliesUnderAttackByID]
 
     #send help to allies under threat
-    for planetToDefend in range(len(alliesToSave)):
+    for planetToDefend in alliesToSave:
         
         try: #ensuring that we have they key-value pair set up
             planetsWithinRange[planetToDefend]
@@ -179,6 +179,6 @@ def protect_ally(state):
                 #all allies (excl any under attack) send tiny help as well
                 elif closeStrongestAlly != ally and ally not in alliesToSave:
                     issue_order(state, ally.ID, planetToDefend.ID, 
-                                fleetSize(state, strongestAllyPlanet, planetToDefend, nearbyAlly))
+                                fleetSize(state, closeStrongestAlly, planetToDefend, nearbyAlly))
 
     return True
