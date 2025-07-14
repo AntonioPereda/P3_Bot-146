@@ -34,19 +34,18 @@ def setup_behavior_tree():
     attack = Action(attack_weakest_enemy_planet)
     offensive_plan.child_nodes = [largest_fleet_check, attack]
 
-    swarm_sequence = Sequence(name='Swarm Spread Strategy')
+    spread_sequence = Sequence(name='Spread Strategy')
     neutral_planet_check = Check(if_neutral_planet_available)
-    swarm_action = Action(swarm_to_weak_neutral_planets)
-    swarm_sequence.child_nodes = [neutral_planet_check, swarm_action]
+    spread_action = Action(spread_to_weakest_neutral_planet)
+    spread_sequence.child_nodes = [neutral_planet_check, spread_action]
 
     protection_plan = Sequence(name='Ally Defense')
     under_invasion_check = Check(is_ally_under_attack)
     defense_action = Action(protect_ally)
     protection_plan.child_nodes = [under_invasion_check, defense_action]
 
+    root.child_nodes = [spread_sequence, protection_plan, offensive_plan, attack.copy()]
 
-    root.child_nodes = [swarm_sequence, protection_plan, offensive_plan, attack.copy()]
-    
     logging.info('\n' + root.tree_to_string())
     return root
 
@@ -89,5 +88,19 @@ manipulate how many troops to send
 growth rate?
 
 ASK ABOUT MAP GENERATION (is it pre-set or random)
+
+
+Selector: High Level Ordering of Strategies
+├── Sequence: Spread Strategy
+│   ├── Check: if_neutral_planet_available
+│   └── Action: spread_to_weakest_neutral_planet
+├── Sequence: Ally Defense
+│   ├── Check: is_ally_under_attack
+│   └── Action: protect_ally
+├── Sequence: Offensive Strategy
+│   ├── Check: have_largest_fleet
+│   └── Action: attack_weakest_enemy_planet
+└── Action: attack_weakest_enemy_planet (fallback)
+
 
 """
