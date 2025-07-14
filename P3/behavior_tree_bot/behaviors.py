@@ -10,6 +10,39 @@ Value = list of Planets within averagePlanetDist of KeyPlanet
 
 planetsWithinRange = {}
 
+def swarm_to_weak_neutral_planets(state):
+    if len(state.my_fleets()) >= 10:
+        return False
+
+    my_planets = state.my_planets()
+    neutral_planets = [planet for planet in state.neutral_planets()
+                       if not any(fleet.destination_planet == planet.ID for fleet in state.my_fleets())]
+    neutral_planets.sort(key=lambda p: p.num_ships)
+
+    if not my_planets or not neutral_planets:
+        return False
+
+    success = False
+
+    for neutral in neutral_planets:
+        # Find best source: strongest nearby planet
+        candidates = sorted(my_planets, key=lambda p: (distanceOfPlanets(p, neutral), -p.num_ships))
+        for source in candidates:
+            if source.num_ships <= 10:
+                continue  # Don't weaken small planets
+
+            dist = state.distance(source.ID, neutral.ID)
+            growth_buffer = neutral.growth_rate * dist
+            required = int(neutral.num_ships + growth_buffer + 1)
+
+            if source.num_ships > required:
+                if issue_order(state, source.ID, neutral.ID, required):
+                    success = True
+                    break  # Don't send multiple fleets to the same neutral
+
+    return success
+
+
 def discoverClosestAllies(state, planet, myAllies):
     planetsWithinRange[planet] = []
 

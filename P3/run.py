@@ -8,8 +8,8 @@ def show_match(bot, opponent_bot, map_num):
         game is replayed via a visual interface.
     """
     command = 'java -jar tools/PlayGame.jar maps/map' + str(map_num) + '.txt 1000 1000 log.txt ' + \
-              '"python ' + bot + '" ' + \
-              '"python ' + opponent_bot + '" ' + \
+              '"python3 ' + bot + '" ' + \
+              '"python3 ' + opponent_bot + '" ' + \
               '| java -jar tools/ShowGame.jar'
     print(command)
     os.system(command)
@@ -20,8 +20,8 @@ def test(bot, opponent_bot, map_num):
     bot_name, opponent_name = bot.split('/')[1].split('.')[0], opponent_bot.split('/')[1].split('.')[0]
     print('Running test:',bot_name,'vs',opponent_name)
     command = 'java -jar tools/PlayGame.jar maps/map' + str(map_num) +'.txt 1000 1000 log.txt ' + \
-              '"python ' + bot + '" ' + \
-              '"python ' + opponent_bot + '" '
+              '"python3 ' + bot + '" ' + \
+              '"python3 ' + opponent_bot + '" '
 
     print(command)
     p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
