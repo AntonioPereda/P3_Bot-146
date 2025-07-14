@@ -65,41 +65,94 @@ def grabPlanetByID(planetID, possiblePlanets):
 
 ### ORDERS ###
 def attack_weakest_enemy_planet(state):
-    # (1) If we currently have a fleet in flight, abort plan.
-    if len(state.my_fleets()) >= 1:
+    """Send just enough ships from nearby planets to capture the weakest enemy planet."""
+
+    my_planets = state.my_planets()
+    enemy_planets = state.enemy_planets()
+
+    if not my_planets or not enemy_planets:
         return False
 
-    # (2) Find my strongest planet.
-    strongest_planet = max(state.my_planets(), key=lambda t: t.num_ships, default=None)
+    action_taken = False
 
-    # (3) Find the weakest enemy planet.
-    weakest_planet = min(state.enemy_planets(), key=lambda t: t.num_ships, default=None)
+    # Get the list of destination IDs our fleets are already heading toward
+    my_fleets = [fleet.destination_planet for fleet in state.my_fleets()]
 
-    if not strongest_planet or not weakest_planet:
-        # No legal source or destination
-        return False
-    else:
-        # (4) Send half the ships from my strongest planet to the weakest enemy planet.
-        return issue_order(state, strongest_planet.ID, weakest_planet.ID, strongest_planet.num_ships / 2)
+    # Sort enemy planets by projected strength after accounting for growth over distance
+    enemy_planets = sorted(enemy_planets, key=lambda enemy: (
+        enemy.num_ships + min(
+            (state.distance(p.ID, enemy.ID) for p in my_planets),
+            default=0
+        ) * enemy.growth_rate
+    ))
+
+    for target in enemy_planets:
+
+        if target.ID in my_fleets:
+            continue  # Skip if already sending a fleet there
+
+        # Calculate distance from each planet to the target
+        source_distances = [(planet, state.distance(planet.ID, target.ID)) for planet in my_planets]
+
+        # Estimate how many ships are needed to capture this planet
+        min_distance = min(dist for _, dist in source_distances)
+        projected_ships_needed = int(target.num_ships + min_distance * target.growth_rate) + 1
+
+        # Sort our planets by how close they are to the target
+        source_distances.sort(key=lambda pair: pair[1])
+
+        total_sent = 0
+
+        for source, dist in source_distances:
+
+            if source.num_ships <= 5:
+                continue  # Skip weak planets
+
+            if total_sent >= projected_ships_needed:
+                break
+
+            remaining = projected_ships_needed - total_sent
+            ships_to_send = min(source.num_ships // 2, remaining)
+
+            if ships_to_send > 0:
+                issue_order(state, source.ID, target.ID, ships_to_send)
+                total_sent += ships_to_send
+                action_taken = True
+
+        if total_sent >= projected_ships_needed:
+            break  # We captured a planet, stop attacking more this turn
+
+    return action_taken
 
 
 def spread_to_weakest_neutral_planet(state):
-    # (1) If we currently have a fleet in flight, just do nothing.
+    """Send just enough ships to take over the weakest neutral planets."""
+
     if len(state.my_fleets()) >= 1:
+        return False  # Avoid spamming too many fleets
+
+    my_planets = state.my_planets()
+    neutral_planets = sorted(state.neutral_planets(), key=lambda p: p.num_ships)
+
+    if not my_planets or not neutral_planets:
         return False
 
-    # (2) Find my strongest planet.
-    strongest_planet = max(state.my_planets(), key=lambda p: p.num_ships, default=None)
+    # Select the strongest planet as the source
+    source = max(my_planets, key=lambda p: p.num_ships)
+    available_ships = source.num_ships
+    action_taken = False
 
-    # (3) Find the weakest neutral planet.
-    weakest_planet = min(state.neutral_planets(), key=lambda p: p.num_ships, default=None)
+    for target in neutral_planets:
+        required_ships = target.num_ships + 1
 
-    if not strongest_planet or not weakest_planet:
-        # No legal source or destination
-        return False
-    else:
-        # (4) Send half the ships from my strongest planet to the weakest enemy planet.
-        return issue_order(state, strongest_planet.ID, weakest_planet.ID, strongest_planet.num_ships / 2)
+        if available_ships > required_ships:
+            issue_order(state, source.ID, target.ID, required_ships)
+            available_ships -= required_ships
+            action_taken = True
+        else:
+            break  # Not enough ships left to conquer another planet
+
+    return action_taken
  
 def protect_ally(state):
 
